@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Suivi des Tâches</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 20px;
+      background-color: #f6fff4;
+      color: #333;
+    }
+
+    h2 {
+      color: #2d6a4f;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: #ffffff;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+
+    th, td {
+      border: 1px solid #cce3d2;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #d8f3dc;
+    }
+
+    button {
+      padding: 6px 12px;
+      background-color: #95d5b2;
+      border: none;
+      color: #000;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    button:hover {
+      background-color: #74c69d;
+    }
+
+    .modal, .adminModal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+      background-color: #fff;
+      margin: 5% auto;
+      padding: 20px;
+      width: 400px;
+      border-radius: 10px;
+    }
+
+    .modal-content textarea,
+    .modal-content input,
+    .modal-content select {
+      width: 100%;
+      margin-top: 10px;
+      margin-bottom: 15px;
+      padding: 8px;
+    }
+
+    .close {
+      float: right;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .admin-bar {
+      margin-bottom: 15px;
+    }
+
+    .observation {
+      font-style: italic;
+      color: #444;
+      background: #e9f5ee;
+      padding: 5px;
+      border-left: 4px solid #74c69d;
+      margin-top: 5px;
+    }
+
+    .tache-red {
+      background-color: #ffe6e6 !important;
+    }
+
+    .tache-green {
+      background-color: #e6ffed !important;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Suivi des Tâches AGENCE ANOSIBE</h2>
+
+<div class="admin-bar">
+  <button onclick="ouvrirLoginAdmin()">Connexion Admin</button>
+  <button onclick="ouvrirFormAjout()" style="display: none;" id="ajouterBtn">Ajouter une tâche</button>
+</div>
+
+<table id="tacheTable">
+  <thead>
+    <tr>
+      <th>Tâche</th>
+      <th>Deadline</th>
+      <th>Responsable</th>
+      <th>Statut</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Rempli dynamiquement -->
+  </tbody>
+</table>
+
+<!-- Modals identiques à la version précédente (traitement, admin, ajout) -->
+<!-- ... -->
+
+<!-- Modal de traitement -->
+<div id="modal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="fermerModal()">&times;</span>
+    <h3>Traitement</h3>
+    <label>Traitement effectué :</label>
+    <textarea id="traitement" rows="3"></textarea>
+
+    <label>Modifier le statut :</label>
+    <select id="statutSelect">
+      <option>Non commencé</option>
+      <option>En cours</option>
+      <option>Traité</option>
+    </select>
+
+    <label>Commentaires / Observations :</label>
+    <textarea id="commentaires" rows="3"></textarea>
+
+    <button onclick="sauvegarder()">Sauvegarder</button>
+  </div>
+</div>
+
+<!-- Modal admin login -->
+<div id="adminLoginModal" class="adminModal">
+  <div class="modal-content">
+    <span class="close" onclick="fermerAdminLogin()">&times;</span>
+    <h3>Connexion Admin</h3>
+    <input type="password" id="adminPassword" placeholder="Mot de passe">
+    <button onclick="verifierMotDePasse()">Valider</button>
+  </div>
+</div>
+
+<!-- Modal ajout tâche -->
+<div id="ajoutModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="fermerAjout()">&times;</span>
+    <h3>Ajouter une Tâche</h3>
+    <input type="text" id="newTache" placeholder="Description de la tâche">
+    <input type="date" id="newDeadline">
+    <input type="text" id="newResponsable" placeholder="Responsable">
+    <button onclick="ajouterTache()">Ajouter</button>
+  </div>
+</div>
+
+<script>
+  let isAdmin = false;
+  let ligneActive = null;
+
+  let taches = JSON.parse(localStorage.getItem("taches") || "[]");
+
+  function sauvegarderDansLocalStorage() {
+    localStorage.setItem("taches", JSON.stringify(taches));
+    afficherTaches();
+  }
+
+  function afficherTaches() {
+    const tbody = document.querySelector("#tacheTable tbody");
+    tbody.innerHTML = "";
+
+    taches.forEach((tache, index) => {
+      const ligne = document.createElement("tr");
+
+      // Couleurs selon statut et date
+      const today = new Date().toISOString().split("T")[0];
+      let classe = "";
+      if (tache.statut === "Traité") {
+        classe = "tache-green";
+      } else if (tache.deadline < today) {
+        classe = "tache-red";
+      }
+
+      ligne.className = classe;
+
+      ligne.innerHTML = `
+        <td>${tache.tache}</td>
+        <td>${tache.deadline}</td>
+        <td>${tache.responsable}</td>
+        <td class="statut">${tache.statut}</td>
+        <td>
+          <button onclick="ouvrirModal(${index})">Traiter</button>
+          ${isAdmin ? `<button onclick="supprimerTache(${index})">Supprimer</button>` : ""}
+        </td>
+      `;
+
+      if (tache.observations && tache.observations.trim() !== "") {
+        const obsDiv = document.createElement("div");
+        obsDiv.className = "observation";
+        obsDiv.textContent = tache.observations;
+        ligne.appendChild(obsDiv);
+      }
+
+      tbody.appendChild(ligne);
+    });
+  }
+
+  function ouvrirModal(index) {
+    ligneActive = index;
+    document.getElementById("statutSelect").value = taches[index].statut;
+    document.getElementById("traitement").value = taches[index].traitement || "";
+    document.getElementById("commentaires").value = taches[index].observations || "";
+    document.getElementById("modal").style.display = "block";
+  }
+
+  function fermerModal() {
+    document.getElementById("modal").style.display = "none";
+  }
+
+  function sauvegarder() {
+    const statut = document.getElementById("statutSelect").value;
+    const traitement = document.getElementById("traitement").value;
+    const observations = document.getElementById("commentaires").value;
+
+    taches[ligneActive].statut = statut;
+    taches[ligneActive].traitement = traitement;
+    taches[ligneActive].observations = observations;
+
+    sauvegarderDansLocalStorage();
+    fermerModal();
+  }
+
+  function ouvrirLoginAdmin() {
+    document.getElementById("adminLoginModal").style.display = "block";
+  }
+
+  function fermerAdminLogin() {
+    document.getElementById("adminLoginModal").style.display = "none";
+  }
+
+  function verifierMotDePasse() {
+    const pass = document.getElementById("adminPassword").value;
+    if (pass === "rianiaina") {
+      isAdmin = true;
+      document.getElementById("ajouterBtn").style.display = "inline-block";
+      fermerAdminLogin();
+      afficherTaches();
+    } else {
+      alert("Mot de passe incorrect.");
+    }
+  }
+
+  function ouvrirFormAjout() {
+    document.getElementById("ajoutModal").style.display = "block";
+  }
+
+  function fermerAjout() {
+    document.getElementById("ajoutModal").style.display = "none";
+  }
+
+  function ajouterTache() {
+    const tache = document.getElementById("newTache").value;
+    const deadline = document.getElementById("newDeadline").value;
+    const responsable = document.getElementById("newResponsable").value;
+
+    if (!tache || !deadline || !responsable) {
+      alert("Tous les champs sont obligatoires.");
+      return;
+    }
+
+    taches.push({
+      tache,
+      deadline,
+      responsable,
+      statut: "Non commencé",
+      traitement: "",
+      observations: ""
+    });
+
+    sauvegarderDansLocalStorage();
+    fermerAjout();
+  }
+
+  function supprimerTache(index) {
+    if (confirm("Supprimer cette tâche ?")) {
+      taches.splice(index, 1);
+      sauvegarderDansLocalStorage();
+    }
+  }
+
+  // Fermer modals si clic à l’extérieur
+  window.onclick = function(event) {
+    const modals = ["modal", "adminLoginModal", "ajoutModal"];
+    modals.forEach(id => {
+      const el = document.getElementById(id);
+      if (event.target === el) el.style.display = "none";
+    });
+  }
+
+  // Charger au démarrage
+  afficherTaches();
+</script>
+
+</body>
+</html>
